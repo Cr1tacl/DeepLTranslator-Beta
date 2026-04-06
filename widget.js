@@ -12,16 +12,18 @@
 
   const MAX_USES = 10;
   const COUNTER_KEY = "translatorBetaCount";
+  const WORKER_URL = "https://translator-api.your-subdomain.workers.dev"; // ← REPLACE after deploy
 
-  // Restore saved position and count
-  chrome.storage.local.get(["betaPosX", "betaPosY", "betaCount"], data => {
+  // Restore saved position, count, and recents
+  chrome.storage.local.get(["betaPosX", "betaPosY", "betaCount", "betaRecents"], data => {
     const savedX = data.betaPosX || 100;
     const savedY = data.betaPosY || 100;
     const savedCount = data.betaCount || 0;
-    buildWidget(savedX, savedY, savedCount);
+    const savedRecents = data.betaRecents || [];
+    buildWidget(savedX, savedY, savedCount, savedRecents);
   });
 
-  function buildWidget(posX, posY, count) {
+  function buildWidget(posX, posY, count, recents) {
     const widget = document.createElement("div");
     widget.id = "translatorBetaWidget";
     widget.style.cssText = `display:block;position:fixed;z-index:2147483647;width:320px;background:#fff;border:2px solid #4a90d9;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.15);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;left:${posX}px;top:${posY}px;`;
@@ -112,27 +114,40 @@
       result.textContent = "Translating…";
       meta.textContent = "";
 
-      const src = srcSel.value === "auto" ? "autodetect" : srcSel.value.toLowerCase();
-      const tgt = tgtSel.value.toLowerCase();
+      const src = srcSel.value === "auto" ? "auto" : srcSel.value;
+      const tgt = tgtSel.value;
 
       try {
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${src}|${tgt}`;
-        const res = await fetch(url);
+        const res = await fetch(WORKER_URL + "/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, source: src, target: tgt, provider: "mymemory" }),
+        });
         const data = await res.json();
-        if (!data.responseData?.translatedText) throw new Error("No response");
+
+        if (!res.ok) {
+          if (data.error === "Free trial expired") {
+            used = MAX_USES;
+            saveCount();
+            showExhausted();
+            return;
+          }
+          throw new Error(data.error || "Server error");
+        }
 
         used++;
         saveCount();
-        const translated = data.responseData.translatedText;
         result.style.color = "#1f2937";
-        result.textContent = translated;
+        result.textContent = data.text;
         output.style.borderColor = "#e5e7eb";
-        updateMeta();
+        const left = data.uses_left !== null ? data.uses_left : Math.max(0, MAX_USES - used);
+        countEl.textContent = left + " left";
+        meta.textContent = left > 0 ? `${left} free use${left===1?"":"s"} remaining` : "";
 
-        if (isExhausted()) showExhausted();
+        if (left <= 0) showExhausted();
       } catch(e) {
         result.style.color = "#dc2626";
-        result.textContent = "Translation failed.";
+        result.textContent = "Translation failed: " + e.message;
         output.style.borderColor = "#fca5a5";
       }
 
