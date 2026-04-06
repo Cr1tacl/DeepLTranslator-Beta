@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Translator Beta",
+  "version": "0.1.0",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "Toggle Translator"
+  },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["widget.js"],
+    "run_at": "document_end"
+  }]
+}
