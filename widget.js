@@ -12,7 +12,7 @@
 
   const MAX_USES = 10;
   const COUNTER_KEY = "translatorBetaCount";
-  const WORKER_URL = "https://translator-api.your-subdomain.workers.dev"; // ← REPLACE after deploy
+  const WORKER_URL = "https://translator-api.allredtheproxd.workers.dev";
 
   // Restore saved position, count, and recents
   chrome.storage.local.get(["betaPosX", "betaPosY", "betaCount", "betaRecents"], data => {
